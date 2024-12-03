@@ -1,0 +1,47 @@
+# Stage 1: Build the Go app
+FROM golang:1.20 AS builder
+
+# Set environment variables for build configuration
+ENV GO111MODULE=on \
+    CGO_ENABLED=0 \
+    GOOS=linux \
+    GOARCH=amd64 \
+    GOPROXY=https://proxy.golang.org,direct
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy Go module files and download dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the source code into the container
+COPY . .
+
+# Build the Go app
+RUN go build -o /autoptic-server .
+
+# Stage 2: Create the final image with minimal size
+FROM alpine:latest
+
+# Set environment variables for the app runtime
+ENV APP_ENV=dev \
+    AUTOPTIC_AWS_ADMIN_PROFILE="autoptic" \
+    AUTOPTIC_INSTANCE_ID="jere-test" \
+    AUTOPTIC_SERVER_PORT="9999" \
+    AUTOPTIC_CMD="./pql" \
+    AUTOPTIC_DATA_DIR="./data" \
+    AUTOPTIC_DATA_ENDPOINT="http://localhost:9999/story/ep/jere-test" \
+    #APP_MODE = #here will go something like server/scheduler....
+# Set the working directory in the final container
+WORKDIR /root/
+
+# Copy the built Go app from the builder stage
+COPY --from=builder /go-app .
+
+# Expose the application's port
+EXPOSE 8080
+
+# Command to run the Go app
+CMD ["./go-app"]
+
